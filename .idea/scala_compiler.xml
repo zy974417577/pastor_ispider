@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ScalaCompilerConfiguration">
+    <profile name="Maven 1" modules="pastor_ispider">
+      <parameters>
+        <parameter value="-dependencyfile" />
+        <parameter value="E:\ruozedata\work\project\pastor_ispider\target/.scala_dependencies" />
+      </parameters>
+    </profile>
+    <profile name="Maven 2" modules="pastor_ispider_utils">
+      <parameters>
+        <parameter value="-dependencyfile" />
+        <parameter value="E:\ruozedata\work\project\pastor_ispider\pastor_ispider_utils\target/.scala_dependencies" />
+      </parameters>
+    </profile>
+    <profile name="Maven 3" modules="pastor_ispider_streaming">
+      <parameters>
+        <parameter value="-dependencyfile" />
+        <parameter value="E:\ruozedata\work\project\pastor_ispider\pastor_ispider_streaming\target/.scala_dependencies" />
+      </parameters>
+    </profile>
+  </component>
+</project>
