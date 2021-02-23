@@ -58,8 +58,8 @@ object IpListCount {
       println(ipCountMap+" "+activeCountMap)
 
       val IpActiveMap = Map(
-        "ipCountMap" -> ipCountMap,
-        "activeCountMap" -> activeCountMap
+        "serverCountMap" -> ipCountMap,
+        "activeNumMap" -> activeCountMap
       )
 
       val key=PropertiesUtil.getStringByKey("cluster.key.monitor.linkProcess","jedisConfig.properties")+System.currentTimeMillis().toString
