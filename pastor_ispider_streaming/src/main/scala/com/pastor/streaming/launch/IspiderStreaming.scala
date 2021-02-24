@@ -4,7 +4,7 @@ import com.pastor.common.util.database.ScalikeDBUtils
 import com.pastor.common.util.jedis.{JedisConnectionUtil, PropertiesUtil}
 import com.pastor.common.util.kafka.KafkaOffsetUtil
 import com.pastor.common.util.log4j.LoggerLevels
-import com.pastor.streaming.businessprocess.IpListCount
+import com.pastor.streaming.businessprocess.{IpListCount, URLFilter}
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -107,10 +107,10 @@ object IspiderStreaming {
         Subscribe[String, String](topics, kafkaParams, formOffsets))
     }
     dateStream.foreachRDD(rdd => {
-      val value: RDD[String] = rdd.map(_.value())
-      value.persist(StorageLevel.MEMORY_ONLY_SER)
+      val valueRDD: RDD[String] = rdd.map(_.value())
+      valueRDD.persist(StorageLevel.MEMORY_ONLY_SER)
       //TODO... IP访问量统计
-      IpListCount.listCount(value)
+      IpListCount.listCount(valueRDD)
       //TODO... 获取是否需要更新匹配规则
       val flag = jedis.get("FilterChangerFlag")
 
@@ -123,6 +123,9 @@ object IspiderStreaming {
 
         jedis.set("FilterChangerFlag","fales")
       }
+
+      //TODO... 匹配url
+      valueRDD.map(messageRDD => URLFilter.filterURL(messageRDD,broadcastValue.value))
       //TODO... 提交offset
       KafkaOffsetUtil.saveOffsets(zkClint, zkHost, zkPath, rdd)
     })
