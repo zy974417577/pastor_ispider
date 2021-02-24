@@ -13,20 +13,28 @@ import scalikejdbc.{DB, SQL}
  * 1.0       2021-02-23        zhaoyang           新增ScalikeDBUtils工具类    *
  ****************************************************************************
  *  explain:                                                                *
- *      TODO... IpListCount公共类，用于链路统计                                 *
+ *      TODO... ScalikeDBUtils，用于操作MySQL数据库，读取清洗规则。               *
  ****************************************************************************/
 object ScalikeDBUtils {
 
-  def queryDB(sql:String,field:String): Unit ={
+  def queryDB(sql:String,field:String = "value"): List[String] ={
 
     DBs.setupAll()
 
-    DB.readOnly { implicit  session =>
+    val ruleArray: List[String] = DB.readOnly { implicit session =>
       SQL(sql)
-        .map(rs=>{
+        .map(rs => {
           rs.string(field)
-        })
+        }).list().apply()
     }
+    ruleArray
   }
 
+  def main(args: Array[String]): Unit = {
+
+    val sql = "select id,name,age from student"
+    val field = "name"
+
+    queryDB(sql,field)
+  }
 }
