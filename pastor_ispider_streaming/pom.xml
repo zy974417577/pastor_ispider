@@ -68,5 +68,13 @@
             <artifactId>junit</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>org.scalikejdbc</groupId>
+            <artifactId>scalikejdbc_${scala.tools.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalikejdbc</groupId>
+            <artifactId>scalikejdbc-config_${scala.tools.version}</artifactId>
+        </dependency>
     </dependencies>
 </project>
