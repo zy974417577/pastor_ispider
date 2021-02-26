@@ -24,7 +24,8 @@ object URLFilter {
     val valueArray = message.split("#CS#")
     if(valueArray.length > 1){
       list.foreach(x=>{
-        if(valueArray(1).matches(x)) flag else flag = false
+//        println(valueArray(1)+" "+ x)
+        if(valueArray(1).matches(x)) flag = false else flag
       })
     }
     flag
