@@ -4,7 +4,7 @@ import com.pastor.common.util.database.ScalikeDBUtils
 import com.pastor.common.util.jedis.{JedisConnectionUtil, PropertiesUtil}
 import com.pastor.common.util.kafka.KafkaOffsetUtil
 import com.pastor.common.util.log4j.LoggerLevels
-import com.pastor.streaming.businessprocess.{IpListCount, URLFilter}
+import com.pastor.streaming.businessprocess.{EncryptedData, IpListCount, URLFilter}
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -108,6 +108,7 @@ object IspiderStreaming {
     }
     dateStream.foreachRDD(rdd => {
       val valueRDD: RDD[String] = rdd.map(_.value())
+//      valueRDD.foreach(println(_))
       valueRDD.persist(StorageLevel.MEMORY_ONLY_SER)
       //TODO... IP访问量统计
       IpListCount.listCount(valueRDD)
@@ -121,11 +122,21 @@ object IspiderStreaming {
         val newRule = ScalikeDBUtils.queryDB(sql)
         broadcastValue =sc.broadcast(newRule)
 
-        jedis.set("FilterChangerFlag","fales")
+        jedis.set("FilterChangerFlag","false")
       }
+      //TODO... 1、过滤数据，踢出掉不符合规则的数据
+      val filterRDD = valueRDD.filter(messageRDD => URLFilter.filterURL(messageRDD, broadcastValue.value))
+      //TODO... 2、数据脱敏
+      val encryptionRDD = filterRDD.map(messageRDD => {
+        //TODO... 2.1手机号脱敏
+        val phoneStr = EncryptedData.encryptedPhone(messageRDD)
+        //TODO... 2.2身份证脱敏
+        EncryptedData.encryptedID(phoneStr)
 
-      //TODO... 匹配url
-      valueRDD.map(messageRDD => URLFilter.filterURL(messageRDD,broadcastValue.value))
+      })
+
+      encryptionRDD.foreach(println(_))
+
       //TODO... 提交offset
       KafkaOffsetUtil.saveOffsets(zkClint, zkHost, zkPath, rdd)
     })
