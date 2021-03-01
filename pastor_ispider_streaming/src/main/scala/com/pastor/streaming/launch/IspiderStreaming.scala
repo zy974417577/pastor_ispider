@@ -124,8 +124,6 @@ object IspiderStreaming {
 
         jedis.set("FilterChangerFlag", "false")
       }
-
-
       //TODO... 1、过滤数据，踢出掉不符合规则的数据
       val filterRDD = valueRDD.filter(messageRDD => URLFilter.filterURL(messageRDD, broadcastValue.value))
       //TODO... 2、数据脱敏
@@ -135,11 +133,10 @@ object IspiderStreaming {
         //TODO... 2.2身份证脱敏
         val idRDD = EncryptedData.encryptedID(phoneStr)
         //TODO... 3数据拆分
-        DataSplit.dateSplit(idRDD)
+        val (request, requestMethod, contentType, requestBody, httpReferrer, remoteAddr, httpUserAgent, timeIso8601, serverAddr, cookiesStr, cookieValue_JSESSIONID, cookieValue_USERID) = DataSplit.dateSplit(idRDD)
+
+        println("request=============> "+request)
       })
-
-
-      encryptionRDD.foreach(println(_))
 
       //TODO... 提交offset
       KafkaOffsetUtil.saveOffsets(zkClint, zkHost, zkPath, rdd)

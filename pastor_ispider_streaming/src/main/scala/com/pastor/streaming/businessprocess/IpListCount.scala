@@ -34,8 +34,6 @@ object IpListCount {
       (ip, 1)
     }).reduceByKey(_ + _)
 
-    ipCount.foreach(println(_))
-
 //  TODO 获取当前最大活跃数
     val activeCount = rdd.map(message => {
       val messageArray = message.split("#CS#")
@@ -53,19 +51,13 @@ object IpListCount {
       val ipCountMap = ipCount.collectAsMap()
       val jedis = JedisConnectionUtil.getJedisCluster
       val activeCountMap = activeCount.collectAsMap()
-
-      println(ipCountMap+" "+activeCountMap)
-
       val IpActiveMap = Map(
         "serverCountMap" -> ipCountMap,
         "activeNumMap" -> activeCountMap
       )
-
       val key=PropertiesUtil.getStringByKey("cluster.key.monitor.linkProcess","jedisConfig.properties")+System.currentTimeMillis().toString
       val seconds=PropertiesUtil.getStringByKey("cluster.exptime.monitor","jedisConfig.properties").toInt
-
       println(Json(DefaultFormats).write(IpActiveMap))
-
       jedis.setex(key,seconds,Json(DefaultFormats).write(IpActiveMap))
     }
   }
