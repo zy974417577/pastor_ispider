@@ -48,7 +48,6 @@ object IpListCount {
       (ip, activeuser)
     }).reduceByKey((_, y) => y)
 
-    activeCount
 //    TODO 写入redis
     if(!activeCount.isEmpty() && !ipCount.isEmpty()){
       val ipCountMap = ipCount.collectAsMap()

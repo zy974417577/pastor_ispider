@@ -4,7 +4,7 @@ import com.pastor.common.util.database.ScalikeDBUtils
 import com.pastor.common.util.jedis.{JedisConnectionUtil, PropertiesUtil}
 import com.pastor.common.util.kafka.KafkaOffsetUtil
 import com.pastor.common.util.log4j.LoggerLevels
-import com.pastor.streaming.businessprocess.{EncryptedData, IpListCount, URLFilter}
+import com.pastor.streaming.businessprocess.{DataSplit, EncryptedData, IpListCount, URLFilter}
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -18,19 +18,19 @@ import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
 import redis.clients.jedis.JedisCluster
 
-/****************************************************************************
+/** **************************************************************************
  * NAME:                IspiderStreaming                                    *
  * PURPOSE:           IspiderStreaming代码主程序                              *
- ****************************************************************************
+ * ***************************************************************************
  * REVISIONS:                                                               *
  * VER          DATE            AUTHOP               DESCRIPTION            *
- ********   ************    **************         ***************          *
+ * *******   ************    **************         ***************          *
  * 1.0       2021-02-23        zhaoyang           新增IspiderStreaming类     *
- ****************************************************************************
- *  explain:                                                                *
+ * ***************************************************************************
+ * explain:                                                                *
  *      TODO... 主程序入口类                                                  *
- *      1、使用广播变量动态匹配数据清洗规则
- ****************************************************************************/
+ * 1、使用广播变量动态匹配数据清洗规则
+ * ***************************************************************************/
 object IspiderStreaming {
 
   def main(args: Array[String]): Unit = {
@@ -108,7 +108,7 @@ object IspiderStreaming {
     }
     dateStream.foreachRDD(rdd => {
       val valueRDD: RDD[String] = rdd.map(_.value())
-//      valueRDD.foreach(println(_))
+      //      valueRDD.foreach(println(_))
       valueRDD.persist(StorageLevel.MEMORY_ONLY_SER)
       //TODO... IP访问量统计
       IpListCount.listCount(valueRDD)
@@ -120,10 +120,12 @@ object IspiderStreaming {
         broadcastValue.unpersist()
         //TODO... 读取MySQL新规则
         val newRule = ScalikeDBUtils.queryDB(sql)
-        broadcastValue =sc.broadcast(newRule)
+        broadcastValue = sc.broadcast(newRule)
 
-        jedis.set("FilterChangerFlag","false")
+        jedis.set("FilterChangerFlag", "false")
       }
+
+
       //TODO... 1、过滤数据，踢出掉不符合规则的数据
       val filterRDD = valueRDD.filter(messageRDD => URLFilter.filterURL(messageRDD, broadcastValue.value))
       //TODO... 2、数据脱敏
@@ -131,9 +133,11 @@ object IspiderStreaming {
         //TODO... 2.1手机号脱敏
         val phoneStr = EncryptedData.encryptedPhone(messageRDD)
         //TODO... 2.2身份证脱敏
-        EncryptedData.encryptedID(phoneStr)
-
+        val idRDD = EncryptedData.encryptedID(phoneStr)
+        //TODO... 3数据拆分
+        DataSplit.dateSplit(idRDD)
       })
+
 
       encryptionRDD.foreach(println(_))
 
