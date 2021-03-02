@@ -57,7 +57,6 @@ object IpListCount {
       )
       val key=PropertiesUtil.getStringByKey("cluster.key.monitor.linkProcess","jedisConfig.properties")+System.currentTimeMillis().toString
       val seconds=PropertiesUtil.getStringByKey("cluster.exptime.monitor","jedisConfig.properties").toInt
-      println(Json(DefaultFormats).write(IpActiveMap))
       jedis.setex(key,seconds,Json(DefaultFormats).write(IpActiveMap))
     }
   }
