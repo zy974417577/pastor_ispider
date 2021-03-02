@@ -1,5 +1,7 @@
 package com.pastor.streaming.launch
 
+import java.util
+
 import com.pastor.common.util.database.ScalikeDBUtils
 import com.pastor.common.util.jedis.{JedisConnectionUtil, PropertiesUtil}
 import com.pastor.common.util.kafka.KafkaOffsetUtil
@@ -8,6 +10,7 @@ import com.pastor.streaming.businessprocess.{DataSplit, EncryptedData, IpListCou
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
 import org.apache.spark.streaming.dstream.InputDStream
@@ -70,7 +73,6 @@ object IspiderStreaming {
     (zkHost, zkPath, topics, kafkaParams, ssc)
   }
 
-
   /**
    * 代码执行函数
    *
@@ -87,10 +89,12 @@ object IspiderStreaming {
     val zkClint: ZkClient = new ZkClient(zkHost)
     //TODO... 读取保存在ZK上的offset
     val offset = KafkaOffsetUtil.readOffsets(zkClint, zkHost, zkPath, topics(0))
-    val sql = "select value from nh_filter_rule"
     //TODO... 读取MySQL中的清洗规则规则,加入广播变量动态读数
-    val ruleArr = ScalikeDBUtils.queryDB(sql)
+    val ruleArr = ScalikeDBUtils.queryDBMatch()
     @volatile var broadcastValue = sc.broadcast(ruleArr)
+    // TODO... 读取MySQL中国际查询国外查询
+    val ruleMap = ScalikeDBUtils.queryRuleMap()
+    @volatile var ruleMapBroadcast= sc.broadcast(ruleMap)
     //TODO... 获取redis连接
     val jedis: JedisCluster = JedisConnectionUtil.getJedisCluster
     //TODO... 获取stream
@@ -106,25 +110,30 @@ object IspiderStreaming {
         PreferConsistent,
         Subscribe[String, String](topics, kafkaParams, formOffsets))
     }
+
     dateStream.foreachRDD(rdd => {
       val valueRDD: RDD[String] = rdd.map(_.value())
-      //      valueRDD.foreach(println(_))
       valueRDD.persist(StorageLevel.MEMORY_ONLY_SER)
       //TODO... IP访问量统计
       IpListCount.listCount(valueRDD)
       //TODO... 获取是否需要更新匹配规则
       val flag = jedis.get("FilterChangerFlag")
-
       if (!flag.isEmpty && flag.toBoolean) {
         //TODO... 清空广播变量
         broadcastValue.unpersist()
         //TODO... 读取MySQL新规则
-        val newRule = ScalikeDBUtils.queryDB(sql)
+        val newRule = ScalikeDBUtils.queryDBMatch()
         broadcastValue = sc.broadcast(newRule)
-
         jedis.set("FilterChangerFlag", "false")
       }
-
+      //TODO... 是否要更新分类规则变更标识
+      val ruleChangeFlagtr = jedis.get("ClassifyRuleChangeFlag")
+      if(!ruleChangeFlagtr.isEmpty && ruleChangeFlagtr.toBoolean){
+        ruleMapBroadcast.unpersist()
+        val newRuleMapBroadcast = ScalikeDBUtils.queryRuleMap()
+        ruleMapBroadcast = sc.broadcast(newRuleMapBroadcast)
+        jedis.set("ClassifyRuleChangeFlag","false")
+      }
 
       //TODO... 1、过滤数据，踢出掉不符合规则的数据
       val filterRDD = valueRDD.filter(messageRDD => URLFilter.filterURL(messageRDD, broadcastValue.value))
@@ -135,11 +144,10 @@ object IspiderStreaming {
         //TODO... 2.2身份证脱敏
         val idRDD = EncryptedData.encryptedID(phoneStr)
         //TODO... 3数据拆分
-        DataSplit.dateSplit(idRDD)
+        val (request, requestMethod, contentType, requestBody, httpReferrer, remoteAddr, httpUserAgent, timeIso8601, serverAddr, cookiesStr, cookieValue_JSESSIONID, cookieValue_USERID) = DataSplit.dateSplit(idRDD)
+        //TODO... 4分类查询：判断是国际还国内分为四种情况：国内查询、国内预定、国际查询、国际预定
+        //
       })
-
-
-      encryptionRDD.foreach(println(_))
 
       //TODO... 提交offset
       KafkaOffsetUtil.saveOffsets(zkClint, zkHost, zkPath, rdd)
