@@ -3,8 +3,7 @@ package com.pastor.common.util.database
 import java.util
 
 import com.pastor.streaming.constants.{BehaviorTypeEnum, FlightTypeEnum}
-import org.json4s.DefaultFormats
-import org.json4s.jackson.Json
+
 import scalikejdbc.config.DBs
 import scalikejdbc.{DB, SQL}
 
@@ -53,8 +52,8 @@ object ScalikeDBUtils {
 
     val queryMap = new util.HashMap[String, List[String]]()
     queryMap.put("nationalQuery",queryDB(NCsql,field))
-    queryMap.put("nationalQuery",queryDB(NYsql,field))
-    queryMap.put("nationalQuery",queryDB(WCsql,field))
+    queryMap.put("nationalBook",queryDB(NYsql,field))
+    queryMap.put("internationalQuery",queryDB(WCsql,field))
     queryMap.put("internationalBook",queryDB(WYsql,field))
     queryMap
   }
