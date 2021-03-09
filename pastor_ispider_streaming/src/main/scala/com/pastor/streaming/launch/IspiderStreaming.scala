@@ -141,7 +141,7 @@ object IspiderStreaming {
         ruleMapBroadcast = sc.broadcast(newRuleMapBroadcast)
         jedis.set("ClassifyRuleChangeFlag","false")
       }
-      //是否需要更新数据
+      //TODO... 是否需要更新数据
       val needUpDataAnalyzeRule=jedis.get("NeedUpDataAnalyzeRule")
       //如果获取的数据是非空的，并且这个值是 true,那么就进行数据的更新操作（在数据库中重
       if(!needUpDataAnalyzeRule.isEmpty&& needUpDataAnalyzeRule.toBoolean){
@@ -156,10 +156,8 @@ object IspiderStreaming {
         //更新完毕后，将 redis 中的 true 改成 false
         jedis.set("AnalyzeRuleNeedUpData","false")
       }
-
       //TODO... 1、过滤数据，踢出掉不符合规则的数据
       val filterRDD = valueRDD.filter(messageRDD => URLFilter.filterURL(messageRDD, broadcastValue.value))
-
       //TODO... 2、数据脱敏
       val encryptionRDD = filterRDD.map(messageRDD => {
         //TODO... 2.1手机号脱敏
@@ -174,10 +172,7 @@ object IspiderStreaming {
         val typeEnum = TravelTypeClassifier.classifyByRefererAndRequestBody(requestType, httpReferrer, requestBody)
         //TODO... 6封装操作类型跟航班,0-查询， 1-预订）
 
-
       }).foreach(println(_))
-
-
       //TODO... 提交offset
       KafkaOffsetUtil.saveOffsets(zkClint, zkHost, zkPath, rdd)
     })
