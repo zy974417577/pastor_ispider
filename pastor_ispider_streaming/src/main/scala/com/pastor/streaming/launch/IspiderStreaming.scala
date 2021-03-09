@@ -94,6 +94,14 @@ object IspiderStreaming {
     // TODO... 读取MySQL中国际查询国外查询
     val ruleMap = ScalikeDBUtils.queryRuleMap()
     @volatile var ruleMapBroadcast= sc.broadcast(ruleMap)
+    //TODO... 读取MySQL航班跟操作类型
+    //数据解析规则-- 查询类
+    var queryRule=ScalikeDBUtils.queryRule(0)
+    @volatile var broadcastQueryRules=sc.broadcast(queryRule)
+    //数据解析规则-- 预定类
+    var bookRule=ScalikeDBUtils.queryRule(1)
+    @volatile var broadcastBookRules=sc.broadcast(bookRule)
+
     //TODO... 获取redis连接
     val jedis: JedisCluster = JedisConnectionUtil.getJedisCluster
     //TODO... 获取stream
@@ -133,6 +141,21 @@ object IspiderStreaming {
         ruleMapBroadcast = sc.broadcast(newRuleMapBroadcast)
         jedis.set("ClassifyRuleChangeFlag","false")
       }
+      //TODO... 是否需要更新数据
+      val needUpDataAnalyzeRule=jedis.get("NeedUpDataAnalyzeRule")
+      //如果获取的数据是非空的，并且这个值是 true,那么就进行数据的更新操作（在数据库中重
+      if(!needUpDataAnalyzeRule.isEmpty&& needUpDataAnalyzeRule.toBoolean){
+        //重新读取 mysql 的数据
+        queryRule= ScalikeDBUtils.queryRule(0)
+        bookRule= ScalikeDBUtils.queryRule(1)
+        //清空广播变量中的数据broadcastQueryRules.unpersist()
+        broadcastBookRules.unpersist()
+        //重新载入新的过滤数据
+        broadcastQueryRules=sc.broadcast(bookRule)
+        broadcastBookRules=sc.broadcast(bookRule)
+        //更新完毕后，将 redis 中的 true 改成 false
+        jedis.set("AnalyzeRuleNeedUpData","false")
+      }
       //TODO... 1、过滤数据，踢出掉不符合规则的数据
       val filterRDD = valueRDD.filter(messageRDD => URLFilter.filterURL(messageRDD, broadcastValue.value))
       //TODO... 2、数据脱敏
@@ -147,10 +170,9 @@ object IspiderStreaming {
        val requestType:RequestType = RequestTypeClassifier.classifyByRequest(request,ruleMapBroadcast.value)
         //TODO... 5飞行类查询：单程、往返；测试数据只有查询没有生产预定数据暂时不做预定的处理业务
         val typeEnum = TravelTypeClassifier.classifyByRefererAndRequestBody(requestType, httpReferrer, requestBody)
-        typeEnum
+        //TODO... 6封装操作类型跟航班,0-查询， 1-预订）
 
       }).foreach(println(_))
-
       //TODO... 提交offset
       KafkaOffsetUtil.saveOffsets(zkClint, zkHost, zkPath, rdd)
     })
