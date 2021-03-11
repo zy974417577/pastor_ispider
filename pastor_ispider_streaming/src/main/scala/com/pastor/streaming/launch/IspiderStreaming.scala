@@ -6,7 +6,7 @@ import com.pastor.common.util.database.ScalikeDBUtils
 import com.pastor.common.util.jedis.{JedisConnectionUtil, PropertiesUtil}
 import com.pastor.common.util.kafka.KafkaOffsetUtil
 import com.pastor.common.util.log4j.LoggerLevels
-import com.pastor.streaming.businessprocess.{DataSplit, EncryptedData, IpListCount, RequestTypeClassifier, TravelTypeClassifier, URLFilter}
+import com.pastor.streaming.businessprocess.{AnalyzeBookRequest, AnalyzeRequest, DataSplit, EncryptedData, IpListCount, RequestTypeClassifier, TravelTypeClassifier, URLFilter}
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -169,8 +169,14 @@ object IspiderStreaming {
         //TODO... 4分类查询：判断是国际还国内分为四种情况：国内查询、国内预定、国际查询、国际预定
        val requestType:RequestType = RequestTypeClassifier.classifyByRequest(request,ruleMapBroadcast.value)
         //TODO... 5飞行类查询：单程、往返；测试数据只有查询没有生产预定数据暂时不做预定的处理业务
-        val typeEnum = TravelTypeClassifier.classifyByRefererAndRequestBody(requestType, httpReferrer, requestBody)
-        //TODO... 6封装操作类型跟航班,0-查询， 1-预订）
+        val travelType = TravelTypeClassifier.classifyByRefererAndRequestBody(requestType, httpReferrer, requestBody)
+        //TODO... 6 去数据库匹配出解析规则，用解析规则解析查询中的 body 数据
+        val queryRequestData = AnalyzeRequest.analyzeQueryRequest( requestType,
+          requestMethod, contentType, request, requestBody, travelType, broadcastQueryRules.value)
+        //TODO...7 去数据库匹配出解析规则，用解析规则解析预定中的 body 数据
+        val bookRequestData = AnalyzeBookRequest.analyzeBookRequest( requestType,
+          requestMethod, contentType, request, requestBody, travelType, broadcastBookRules.value)
+
 
       }).foreach(println(_))
       //TODO... 提交offset
