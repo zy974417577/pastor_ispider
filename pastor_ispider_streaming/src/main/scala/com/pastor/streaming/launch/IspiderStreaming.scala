@@ -6,7 +6,7 @@ import com.pastor.common.util.database.ScalikeDBUtils
 import com.pastor.common.util.jedis.{JedisConnectionUtil, PropertiesUtil}
 import com.pastor.common.util.kafka.KafkaOffsetUtil
 import com.pastor.common.util.log4j.LoggerLevels
-import com.pastor.streaming.businessprocess.{AnalyzeBookRequest, AnalyzeRequest, DataSplit, EncryptedData, IpListCount, RequestTypeClassifier, TravelTypeClassifier, URLFilter}
+import com.pastor.streaming.businessprocess.{AnalyzeBookRequest, AnalyzeRequest, DataSplit, EncryptedData, IpListCount, IpOperation, RequestTypeClassifier, TravelTypeClassifier, URLFilter}
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -101,6 +101,10 @@ object IspiderStreaming {
     //数据解析规则-- 预定类
     var bookRule=ScalikeDBUtils.queryRule(1)
     @volatile var broadcastBookRules=sc.broadcast(bookRule)
+    //TODO... 读取MySQL中黑名单-高频 IP 的数据
+    var blackIPList= ScalikeDBUtils.getBlackIpDB()
+    @volatile var broadcastBlackIPList=sc.broadcast(blackIPList)
+
 
     //TODO... 获取redis连接
     val jedis: JedisCluster = JedisConnectionUtil.getJedisCluster
@@ -156,6 +160,19 @@ object IspiderStreaming {
         //更新完毕后，将 redis 中的 true 改成 false
         jedis.set("AnalyzeRuleNeedUpData","false")
       }
+      //TODO... 获取是否更新标识
+      val needUpDateBlackIPList = jedis.get("NeedUpDateBlackIPList")
+      //判断是否需要更新
+      if(!needUpDateBlackIPList.isEmpty&&needUpDateBlackIPList.toBoolean){
+        //获取数据库中ip黑名单
+        val newBroadcastBlackIPList = ScalikeDBUtils.getBlackIpDB()
+        //释放广播变量
+        broadcastBlackIPList.unpersist()
+        //重新加载广播变量
+        broadcastBlackIPList = sc.broadcast(newBroadcastBlackIPList)
+        //更标识
+        jedis.set("NeedUpDateBlackIPList","false")
+      }
       //TODO... 1、过滤数据，踢出掉不符合规则的数据
       val filterRDD = valueRDD.filter(messageRDD => URLFilter.filterURL(messageRDD, broadcastValue.value))
       //TODO... 2、数据脱敏
@@ -176,7 +193,8 @@ object IspiderStreaming {
         //TODO...7 去数据库匹配出解析规则，用解析规则解析预定中的 body 数据
         val bookRequestData = AnalyzeBookRequest.analyzeBookRequest( requestType,
           requestMethod, contentType, request, requestBody, travelType, broadcastBookRules.value)
-
+        //TODO...8 解析是否为黑名单IP
+        IpOperation.isFreIP(remoteAddr,broadcastBlackIPList.value)
 
       }).foreach(println(_))
       //TODO... 提交offset
