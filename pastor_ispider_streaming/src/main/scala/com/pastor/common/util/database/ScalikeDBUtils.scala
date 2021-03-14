@@ -7,7 +7,7 @@ import com.pastor.streaming.constants.{BehaviorTypeEnum, FlightTypeEnum}
 import scalikejdbc.config.DBs
 import scalikejdbc.{DB, SQL}
 
-/** ***************************************************************************
+/*****************************************************************************
  * NAME:                ScalikeDBUtils                                       *
  * PURPOSE:            Scalike查询数据库                                       *
  * ***************************************************************************
@@ -16,11 +16,26 @@ import scalikejdbc.{DB, SQL}
  * *******   ************    **************         ***************          *
  * 1.0       2021-02-23        zhaoyang           新增ScalikeDBUtils工具类 。  *
  * 1.1       2021-03-07        zhaoyang           新增queryRule方法           *
+ * 1.2       2021-03-14        zhaoyang           新增getBlackIpDB方法        *
  * ***************************************************************************
  * explain:                                                                 *
  *      TODO... ScalikeDBUtils，用于操作MySQL数据库，读取清洗规则。               *
  * ***************************************************************************/
 object ScalikeDBUtils {
+
+  /**
+   * 查询数据库中黑名单ip数据
+   * @return 返回数据中所有黑名单数据
+   */
+  def getBlackIpDB() = {
+
+    //数据查询的语句
+    val sql ="select ip_name from nh_ip_blacklist"
+    //接数据字段
+    val field="ip_name"
+    queryDB(sql,field)
+  }
+
   /**
    * 读取MySQL的航班规则
    *
