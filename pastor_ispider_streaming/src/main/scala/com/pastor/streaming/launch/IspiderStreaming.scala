@@ -1,12 +1,12 @@
 package com.pastor.streaming.launch
 
 
-import com.pastor.common.bean.RequestType
+import com.pastor.common.bean.{BookRequestData, ProcessedData, RequestType}
 import com.pastor.common.util.database.ScalikeDBUtils
 import com.pastor.common.util.jedis.{JedisConnectionUtil, PropertiesUtil}
 import com.pastor.common.util.kafka.KafkaOffsetUtil
 import com.pastor.common.util.log4j.LoggerLevels
-import com.pastor.streaming.businessprocess.{AnalyzeBookRequest, AnalyzeRequest, DataSplit, EncryptedData, IpListCount, IpOperation, RequestTypeClassifier, TravelTypeClassifier, URLFilter}
+import com.pastor.streaming.businessprocess.{AnalyzeBookRequest, AnalyzeRequest, DataPackage, DataSplit, EncryptedData, IpListCount, IpOperation, RequestTypeClassifier, TravelTypeClassifier, URLFilter}
 import org.I0Itec.zkclient.ZkClient
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
@@ -21,16 +21,16 @@ import org.apache.spark.{SparkConf, SparkContext}
 import redis.clients.jedis.JedisCluster
 
 /** **************************************************************************
- * NAME:                IspiderStreaming                                    *
- * PURPOSE:           IspiderStreaming代码主程序                              *
+ * NAME:                IspiderStreaming                                     *
+ * PURPOSE:           IspiderStreaming代码主程序                               *
  * ***************************************************************************
- * REVISIONS:                                                               *
- * VER          DATE            AUTHOP               DESCRIPTION            *
+ * REVISIONS:                                                                *
+ * VER          DATE            AUTHOP               DESCRIPTION             *
  * *******   ************    **************         ***************          *
- * 1.0       2021-02-23        zhaoyang           新增IspiderStreaming类     *
+ * 1.0       2021-02-23        zhaoyang           新增IspiderStreaming类      *
  * ***************************************************************************
- * explain:                                                                *
- *      TODO... 主程序入口类                                                  *
+ * explain:                                                                  *
+ *      TODO... 主程序入口类                                                   *
  * 1、使用广播变量动态匹配数据清洗规则
  * ***************************************************************************/
 object IspiderStreaming {
@@ -104,8 +104,6 @@ object IspiderStreaming {
     //TODO... 读取MySQL中黑名单-高频 IP 的数据
     var blackIPList= ScalikeDBUtils.getBlackIpDB()
     @volatile var broadcastBlackIPList=sc.broadcast(blackIPList)
-
-
     //TODO... 获取redis连接
     val jedis: JedisCluster = JedisConnectionUtil.getJedisCluster
     //TODO... 获取stream
@@ -194,8 +192,15 @@ object IspiderStreaming {
         val bookRequestData = AnalyzeBookRequest.analyzeBookRequest( requestType,
           requestMethod, contentType, request, requestBody, travelType, broadcastBookRules.value)
         //TODO...8 解析是否为黑名单IP
-        IpOperation.isFreIP(remoteAddr,broadcastBlackIPList.value)
-
+        val highFrqIPGroup = IpOperation.isFreIP(remoteAddr, broadcastBlackIPList.value)
+        //TODO...9 数据结构化加工，封装成ProcessedData
+        val processedData = DataPackage.dataPackage("", requestMethod, request,
+          remoteAddr, httpUserAgent, timeIso8601,
+          serverAddr, highFrqIPGroup,
+          requestType, travelType, cookieValue_JSESSIONID, cookieValue_USERID,
+          queryRequestData, bookRequestData,
+          httpReferrer)
+        processedData
       }).foreach(println(_))
       //TODO... 提交offset
       KafkaOffsetUtil.saveOffsets(zkClint, zkHost, zkPath, rdd)
